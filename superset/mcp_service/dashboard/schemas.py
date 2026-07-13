@@ -452,7 +452,20 @@ class DashboardInfo(BaseModel):
     chart_count: int = 0
     editors: List[SubjectInfo] = Field(default_factory=list)
     tags: List[TagInfo] = Field(default_factory=list)
-    charts: List[DashboardChartSummary] = Field(default_factory=list)
+    charts: List[DashboardChartSummary] = Field(
+        default_factory=list,
+        description=(
+            "Charts on this dashboard. May be capped below chart_count "
+            "(cap: MCP_RESPONSE_SIZE_CONFIG['max_list_items']) when the full "
+            "response would exceed the token budget. "
+            "Compare len(charts) to chart_count to detect this. For "
+            "dashboards with more charts than the cap, call list_charts "
+            "with filters=[{'col': 'dashboards', 'opr': 'eq', "
+            "'value': <this dashboard's id>}] and page through with "
+            "page/page_size to retrieve the complete list regardless of "
+            "size."
+        ),
+    )
 
     # Structured filter information extracted from json_metadata
     native_filters: List[NativeFilterSummary] = Field(
@@ -460,7 +473,11 @@ class DashboardInfo(BaseModel):
         description=(
             "Native filters configured on this dashboard. Extracted from "
             "json_metadata for LLM consumption. Includes filter name/type, "
-            "and target columns only when data-model metadata is allowed."
+            "and target columns only when data-model metadata is allowed. "
+            "Subject to the same max_list_items cap as charts, though "
+            "dashboards rarely have enough native filters to hit it; "
+            "operators can raise MCP_RESPONSE_SIZE_CONFIG['max_list_items'] "
+            "for tenants that do."
         ),
     )
     cross_filters_enabled: bool | None = Field(
@@ -1790,6 +1807,50 @@ def dashboard_layout_serializer(dashboard: "Dashboard") -> DashboardLayout:
             charts=charts,
             has_layout=bool(position_json_str),
         )
+    )
+
+
+class DeleteDashboardRequest(BaseModel):
+    """Request schema for delete_dashboard."""
+
+    identifier: int | str = Field(
+        ...,
+        description="Dashboard identifier - numeric ID, UUID string, or slug.",
+    )
+
+    @field_validator("identifier", mode="before")
+    @classmethod
+    def reject_bool_identifier(cls, value: object) -> object:
+        """bool is a subclass of int, so identifier=true would coerce to
+        dashboard ID 1 and delete the wrong object; reject it outright."""
+        if isinstance(value, bool):
+            raise ValueError("identifier must be an integer ID, UUID, or slug string")
+        return value
+
+
+class DeleteDashboardResponse(BaseModel):
+    """Result of a delete_dashboard operation."""
+
+    success: bool = Field(description="Whether the dashboard was deleted")
+    deleted_id: int | None = Field(None, description="ID of the deleted dashboard")
+    deleted_name: str | None = Field(None, description="Title of the deleted dashboard")
+    soft_deleted: bool = Field(
+        False,
+        description=(
+            "True when the dashboard was soft-deleted (moved to trash, because "
+            "the SOFT_DELETE feature flag is enabled) and can be restored by an "
+            "owner or Admin. False means the delete was permanent."
+        ),
+    )
+    message: str | None = Field(None, description="Human-readable outcome message")
+    error: str | None = Field(None, description="Error message if the delete failed")
+    error_type: str | None = Field(None, description="Type of error if failed")
+    permission_denied: bool = Field(
+        False,
+        description=(
+            "True when the caller lacks permission to delete the dashboard (do "
+            "not retry; ask the user)."
+        ),
     )
 
 
