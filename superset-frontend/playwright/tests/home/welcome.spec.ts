@@ -25,7 +25,7 @@ import { TIMEOUT } from '../../utils/constants';
 // suite only waits for the welcome URL + session cookie, so it would not catch
 // a welcome page that redirects correctly but renders no content.
 test('welcome page renders its content, not just the nav', async ({ page }) => {
-  await page.goto(`/${URL.WELCOME}`);
+  await page.goto(URL.WELCOME);
 
   // "Recents" is a Home content section header (a Collapse panel) that does not
   // exist in the top navigation, so its presence proves the route content

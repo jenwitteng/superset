@@ -200,14 +200,16 @@ testWithAssets(
     await shot('02-modal-open');
 
     // 5. Delete the "Time grain" Display Control in the modal sidebar.
-    const modal = page.locator('.ant-modal-content');
-    const controlRow = modal.getByText('Time grain', { exact: false }).first();
+    const modal = page.getByRole('dialog', {
+      name: 'Add or edit display controls',
+    });
+    const controlRow = modal.getByRole('tab', {
+      name: /Time grain/,
+    });
     await controlRow.hover();
-    // Trash icon in the same sidebar row.
-    const rowContainer = controlRow.locator(
-      'xpath=ancestor::*[@role="tab"][1]',
-    );
-    await rowContainer.locator('.anticon-delete, [aria-label]').last().click();
+    await controlRow
+      .getByRole('button', { name: 'Remove customization' })
+      .click();
     await expect(modal.getByText('(Removed)').first()).toBeVisible();
     // eslint-disable-next-line no-console
     console.log('STEP 2: Display control marked (Removed) in modal.');
